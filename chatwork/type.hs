@@ -93,3 +93,41 @@ instance FromJSON Room where
     <*> v .:? "p"
   parseJSON _          = mzero
 
+
+data PData = PData {
+               roomData :: [(String, PRoomData)],
+               p :: [String],
+               m :: [String],
+               d :: [String],
+               rid :: String,
+               t :: String,
+               ptype :: String
+             }
+instance FromJSON PData where
+  parseJSON (Object v) = PData
+    <$> v .: "i"
+    <*> v .: "p"
+    <*> v .: "m"
+    <*> v .: "d"
+    <*> v .: "t"
+    <*> v .: "rid"
+    <*> v .: "type"
+  parseJSON _           = mzero
+
+data PRoomData = PRoomData {
+                   c :: Int,
+                   f :: Int,
+                   l :: Int,
+                   lf :: Int,
+                   ptime :: Int,
+                   u :: Int
+                 }
+instance FromJSON PRoomData where
+  parseJSON (Object v) = PRoomData
+    <$> v .: "c"
+    <*> v .: "u"
+    <*> v .: "l"
+    <*> v .: "f"
+    <*> v .: "lf"
+    <*> v .: "t"
+  parseJSON _           = mzero

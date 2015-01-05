@@ -78,6 +78,19 @@ request method cmd params auth = do
     zipTuple (a, b) = a ++ "=" ++ b
     join s a b = a ++ s ++ b
 
+doHttp method cmd params body auth = do
+  time <- formatTime defaultTimeLocale "%s" <$> getCurrentTime
+  let query = foldl (join "&") [] $ map zipTuple (params ++ authParams auth ++ [("_", time)])
+  let url = cmdBase ++ "?cmd=" ++ cmd ++ "&" ++ query
+  _req <- parseUrl url
+  let req = (urlEncodedBody body _req){cookieJar = Just $ jar auth}
+  withManager $ \m -> do
+    res <- httpLbs req m
+    liftIO $ pure $ responseBody res
+  where
+    zipTuple (a, b) = a ++ "=" ++ b
+    join s a b = a ++ s ++ b
+
 authParams :: Auth -> QueryParam
 authParams auth = [ ("myid"       ,  myid auth),
                     ("account_id" ,  myid auth),
