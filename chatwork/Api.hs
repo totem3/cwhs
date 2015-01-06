@@ -169,3 +169,4 @@ jsStrVar str = do
 
 eol :: GenParser Char st Char
 eol = char '\n'
+
