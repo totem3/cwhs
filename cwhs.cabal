@@ -3,8 +3,8 @@
 
 name:                cwhs
 version:             0.1.0.1
--- synopsis:            
--- description:         
+-- synopsis:
+-- description:
 homepage:            https://github.com/totem3/cwhs
 license:             MIT
 license-file:        LICENSE
