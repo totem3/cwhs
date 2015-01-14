@@ -4,7 +4,7 @@ import Control.Monad.Trans.Reader
 import Data.List (intercalate)
 
 data ChatworkConfig = ChatworkConfig {
-  apiBase :: String,
+  apiBase :: Maybe String,
   office :: Maybe String,
   user :: String,
   pass :: String
@@ -15,9 +15,10 @@ type Chatwork m = ReaderT ChatworkConfig m
 class MonadChatwork m where
   getApiBase :: m String
 
-buildUrl :: [String] -> Chatwork IO String
+buildUrl :: [String] -> Chatwork m String
 buildUrl paths = do
-  base <- fmap apiBase ask
+  cw <- ask
+  base <- runReaderT cw
   return $ base ++ (intercalate "/" paths)
 
 {-
