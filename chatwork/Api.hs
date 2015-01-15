@@ -38,9 +38,9 @@ loginParams = [ ("orgkey"     ,  office),
 
 
 getUpdate :: String -> Auth -> ApiResponse GetUpdate
-getUpdate lastId auth = do
+getUpdate _lastId auth = do
   get "get_update" params auth
-  where params = [ ("last_id" , lastId),
+  where params = [ ("last_id" , _lastId),
                    ("new"     , "1") ]
 
 readChat :: RoomId -> MessageId -> Auth -> ApiResponse ReadChat
@@ -73,7 +73,7 @@ request method cmd params auth = do
   let req = _req {cookieJar = Just $ jar auth}
   withManager $ \m -> do
     res <- httpLbs req m
-    liftIO $ pure $ decode (responseBody res)
+    pure $ decode (responseBody res)
   where
     zipTuple (a, b) = a ++ "=" ++ b
     join s a b = a ++ s ++ b
@@ -86,7 +86,7 @@ doHttp method cmd params body auth = do
   let req = (urlEncodedBody body _req){cookieJar = Just $ jar auth}
   withManager $ \m -> do
     res <- httpLbs req m
-    liftIO $ pure $ responseBody res
+    pure $ responseBody res
   where
     zipTuple (a, b) = a ++ "=" ++ b
     join s a b = a ++ s ++ b
@@ -115,7 +115,7 @@ login = do
     let auth = case (myid, token) of
                  (Just m, Just t) -> Just $ Auth {jar = jar, myid = m, accessToken = t}
                  _ -> Nothing
-    liftIO $ pure auth
+    pure auth
   where
     pack (a, b) = (a, C.pack b)
     emptuple (a, b) = a == "" && b == ""
