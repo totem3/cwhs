@@ -2,22 +2,24 @@
 module Chatwork.Api where
 
 import Network.HTTP.Conduit
-import Control.Monad.IO.Class (liftIO)
+import Network.HTTP.Types
 import Control.Applicative (pure, (<$>))
 import System.Environment (getEnv)
 import qualified Data.ByteString.Char8 as C
 import Text.ParserCombinators.Parsec
 import qualified Data.ByteString.Lazy as BL
+import Chatwork.ChatworkConfig (Chatwork)
 import Chatwork.Type
 import Data.Time.Clock (getCurrentTime)
 import System.Locale (defaultTimeLocale)
 import Data.Time.Format (formatTime)
 import Data.Aeson (decode, FromJSON)
 import System.IO.Unsafe (unsafePerformIO)
+import Control.Monad.Reader (runReaderT, ask)
 
 type QueryParam = [(String, String)]
 
-type ApiResponse a = IO (Maybe (Chatwork.Type.Response a))
+type ApiResponse a = Maybe (Chatwork.Type.Response a)
 
 apiBase :: String
 apiBase = unsafePerformIO (getEnv "CW_API_BASE")
@@ -37,19 +39,19 @@ loginParams = [ ("orgkey"     ,  office),
                 ("login"      ,  "Login") ]
 
 
-getUpdate :: String -> Auth -> ApiResponse GetUpdate
+getUpdate :: String -> Auth -> Chatwork IO (ApiResponse GetUpdate)
 getUpdate _lastId auth = do
   get "get_update" params auth
   where params = [ ("last_id" , _lastId),
                    ("new"     , "1") ]
 
-readChat :: RoomId -> MessageId -> Auth -> ApiResponse ReadChat
+readChat :: RoomId -> MessageId -> Auth -> Chatwork IO (ApiResponse ReadChat)
 readChat roomId lastChatId auth = do
   get "read" params auth
   where params = [ ("last_chat_id" , lastChatId),
                    ("room_id"      , roomId) ]
 
-loadChat :: RoomId -> Auth -> ApiResponse LoadChat
+loadChat :: RoomId -> Auth -> Chatwork IO (ApiResponse LoadChat)
 loadChat roomId auth = do
   get "load_chat" params auth
   where params = [ ("room_id"         ,  roomId),
@@ -59,34 +61,21 @@ loadChat roomId auth = do
                    ("unread_num"      ,  "0"),
                    ("desc"            ,  "1") ]
 
-get :: (FromJSON a) => String -> [(String, String)] -> Auth -> ApiResponse a
+get :: (FromJSON a) => Method -> [(String, String)] -> Auth -> Chatwork IO (Chatwork.Type.Response a)
 get = request "GET"
-post :: (FromJSON a) => String -> [(String, String)] -> Auth -> ApiResponse a
+post :: (FromJSON a) => Method -> [(String, String)] -> Auth -> Chatwork IO (Chatwork.Type.Response a)
 post = request "POST"
 
-request :: (FromJSON a) => String -> String -> [(String, String)] -> Auth -> ApiResponse a
+request :: (FromJSON a) => Method -> String -> [(String, String)] -> Auth -> Chatwork IO (Maybe (Chatwork.Type.Response a))
 request method cmd params auth = do
   time <- formatTime defaultTimeLocale "%s" <$> getCurrentTime
   let query = foldl (join "&") [] $ map zipTuple (params ++ authParams auth ++ [("_", time)])
   let url = cmdBase ++ "?cmd=" ++ cmd ++ "&" ++ query
   _req <- parseUrl url
-  let req = _req {cookieJar = Just $ jar auth}
+  let req = _req {cookieJar = Just (jar auth), method = method}
   withManager $ \m -> do
     res <- httpLbs req m
     pure $ decode (responseBody res)
-  where
-    zipTuple (a, b) = a ++ "=" ++ b
-    join s a b = a ++ s ++ b
-
-doHttp method cmd params body auth = do
-  time <- formatTime defaultTimeLocale "%s" <$> getCurrentTime
-  let query = foldl (join "&") [] $ map zipTuple (params ++ authParams auth ++ [("_", time)])
-  let url = cmdBase ++ "?cmd=" ++ cmd ++ "&" ++ query
-  _req <- parseUrl url
-  let req = (urlEncodedBody body _req){cookieJar = Just $ jar auth}
-  withManager $ \m -> do
-    res <- httpLbs req m
-    pure $ responseBody res
   where
     zipTuple (a, b) = a ++ "=" ++ b
     join s a b = a ++ s ++ b

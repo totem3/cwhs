@@ -1,4 +1,4 @@
-module Chatwork where
+module Chatwork.ChatworkConfig where
 
 import Control.Monad.Trans.Reader
 import Data.List (intercalate)
