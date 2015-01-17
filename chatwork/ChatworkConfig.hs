@@ -1,6 +1,6 @@
 module Chatwork.ChatworkConfig where
 
-import Control.Monad.Trans.Reader
+import Control.Monad.Reader
 import Data.List (intercalate)
 
 data ChatworkConfig = ChatworkConfig {
@@ -8,11 +8,6 @@ data ChatworkConfig = ChatworkConfig {
                         office :: String,
                         user :: String,
                         pass :: String
-                      }
+                      } deriving (Show)
 
 type Chatwork = ReaderT ChatworkConfig
-
-buildUrl :: [String] -> Chatwork IO String
-buildUrl paths = do
-  _base <- fmap base ask
-  return $ _base ++ (intercalate "/" paths)
