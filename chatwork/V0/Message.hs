@@ -1,5 +1,5 @@
 {-# LANGUAGE OverloadedStrings, FlexibleContexts #-}
-module Chatwork.Message where
+module Chatwork.V0.Message where
 
 import Control.Applicative ((<*>))
 import Control.Monad (mzero)

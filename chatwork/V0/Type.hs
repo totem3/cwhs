@@ -1,11 +1,12 @@
 {-# LANGUAGE OverloadedStrings #-}
-module Chatwork.Type where
+module Chatwork.V0.Type where
+
 import Network.HTTP.Conduit (CookieJar)
 import Data.Aeson
 import Control.Applicative ((<*>))
 import Data.Functor ((<$>))
 import Control.Monad (mzero)
-import Chatwork.Message
+import Chatwork.V0.Message
 
 data Auth = Auth { jar :: CookieJar, myid, accessToken :: String } deriving Show
 

@@ -1,5 +1,5 @@
 {-# LANGUAGE OverloadedStrings, FlexibleContexts #-}
-module Chatwork.Api where
+module Chatwork.V0.Api where
 
 import Network.HTTP.Conduit
 import Network.HTTP.Types
@@ -8,36 +8,19 @@ import System.Environment (getEnv)
 import qualified Data.ByteString.Char8 as C
 import Text.ParserCombinators.Parsec
 import qualified Data.ByteString.Lazy as BL
-import Chatwork.ChatworkConfig (Chatwork)
-import Chatwork.Type
+import Chatwork.V0.ChatworkConfig
+import Chatwork.V0.Type
 import Data.Time.Clock (getCurrentTime)
 import System.Locale (defaultTimeLocale)
 import Data.Time.Format (formatTime)
 import Data.Aeson (decode, FromJSON)
 import System.IO.Unsafe (unsafePerformIO)
 import Control.Monad.Reader (runReaderT, ask)
+import Control.Monad.IO.Class (liftIO)
 
 type QueryParam = [(String, String)]
 
-type ApiResponse a = Maybe (Chatwork.Type.Response a)
-
-apiBase :: String
-apiBase = unsafePerformIO (getEnv "CW_API_BASE")
-
-office :: String
-office = unsafePerformIO (getEnv "CW_OFFICE")
-
-cmdBase :: String
-cmdBase = apiBase ++ "/gateway.php"
-
-loginUrl :: String
-loginUrl = apiBase ++ "/login.php?lang=en&args="
-
-loginParams :: [(C.ByteString, String)]
-loginParams = [ ("orgkey"     ,  office),
-                ("auto_login" ,  "on"),
-                ("login"      ,  "Login") ]
-
+type ApiResponse a = Maybe (Chatwork.V0.Type.Response a)
 
 getUpdate :: String -> Auth -> Chatwork IO (ApiResponse GetUpdate)
 getUpdate _lastId auth = do
@@ -61,16 +44,17 @@ loadChat roomId auth = do
                    ("unread_num"      ,  "0"),
                    ("desc"            ,  "1") ]
 
-get :: (FromJSON a) => Method -> [(String, String)] -> Auth -> Chatwork IO (Chatwork.Type.Response a)
+get :: (FromJSON a) => String -> [(String, String)] -> Auth -> Chatwork IO (Maybe (Chatwork.V0.Type.Response a))
 get = request "GET"
-post :: (FromJSON a) => Method -> [(String, String)] -> Auth -> Chatwork IO (Chatwork.Type.Response a)
+post :: (FromJSON a) => String -> [(String, String)] -> Auth -> Chatwork IO (Maybe (Chatwork.V0.Type.Response a))
 post = request "POST"
 
-request :: (FromJSON a) => Method -> String -> [(String, String)] -> Auth -> Chatwork IO (Maybe (Chatwork.Type.Response a))
+request :: (FromJSON a) => Method -> String -> [(String, String)] -> Auth -> Chatwork IO (Maybe (Chatwork.V0.Type.Response a))
 request method cmd params auth = do
-  time <- formatTime defaultTimeLocale "%s" <$> getCurrentTime
+  let time = unsafePerformIO $ formatTime defaultTimeLocale "%s" <$> getCurrentTime
   let query = foldl (join "&") [] $ map zipTuple (params ++ authParams auth ++ [("_", time)])
-  let url = cmdBase ++ "?cmd=" ++ cmd ++ "&" ++ query
+  base <- fmap base ask
+  let url = base ++ "gateway.php?cmd=" ++ cmd ++ "&" ++ query
   _req <- parseUrl url
   let req = _req {cookieJar = Just (jar auth), method = method}
   withManager $ \m -> do
@@ -88,11 +72,14 @@ authParams auth = [ ("myid"       ,  myid auth),
                     ("ver"        ,  "1.80a"),
                     ("_av"        ,  "4") ]
 
+login :: Chatwork IO (Maybe Auth)
 login = do
-  req <- parseUrl loginUrl
-  password <- getEnv "CW_PASSWORD"
-  email <- getEnv "CW_USER"
-  let _params = fmap pack $ [("email", email), ("password", password)] ++ loginParams
+  _base <- fmap base ask
+  req <- parseUrl $ _base ++ "login.php?lang=en&args="
+  password <- fmap pass ask
+  email <- fmap user ask
+  office <- fmap office ask
+  let _params = fmap pack $ [("email", email), ("password", password), ("orgkey", office), ("auto_login", "on"), ("login", "Login")]
   let _req = (urlEncodedBody _params req) {method="POST"}
   withManager $ \m -> do
     res <- httpLbs _req m
@@ -104,7 +91,7 @@ login = do
     let auth = case (myid, token) of
                  (Just m, Just t) -> Just $ Auth {jar = jar, myid = m, accessToken = t}
                  _ -> Nothing
-    pure auth
+    liftIO.pure $ auth
   where
     pack (a, b) = (a, C.pack b)
     emptuple (a, b) = a == "" && b == ""
