@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings, DeriveGeneric #-}
 module Chatwork.V0.Type where
 
 import Network.HTTP.Conduit (CookieJar)
@@ -7,6 +7,7 @@ import Control.Applicative ((<*>))
 import Data.Functor ((<$>))
 import Control.Monad (mzero)
 import Chatwork.V0.Message
+import GHC.Generics
 
 data Auth = Auth { jar :: CookieJar, myid, accessToken :: String } deriving Show
 
@@ -23,6 +24,16 @@ instance (FromJSON a) => FromJSON (Response a) where
     <$> v .: "status"
     <*> v .: "result"
   parseJSON _          = mzero
+
+data SendChatData = SendChatData {
+                      text :: String,
+                      room_id :: String,
+                      last_chat_id :: String,
+                      read :: String,
+                      edit_id :: String
+                    } deriving (Show, Generic)
+
+instance ToJSON SendChatData
 
 type ResponseLoadChat = Response LoadChat
 

@@ -1,7 +1,6 @@
 module Chatwork.V0.ChatworkConfig where
 
 import Control.Monad.Reader
-import Data.List (intercalate)
 import Chatwork.V0.Type (Auth)
 
 data ChatworkConfig = ChatworkConfig {

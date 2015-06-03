@@ -1,26 +1,49 @@
 {-# LANGUAGE OverloadedStrings, FlexibleContexts #-}
-module Chatwork.V0.Api where
+module Chatwork.V0.Api (
+    module Chatwork.V0.ChatworkConfig
+  , module Chatwork.V0.Type
+  , module Chatwork.V0.Message
+  , login
+  , loadChat
+  , readChat
+  , getUpdate
+)
+where
 
 import Network.HTTP.Conduit
 import Network.HTTP.Types
 import Control.Applicative (pure, (<$>))
-import System.Environment (getEnv)
 import qualified Data.ByteString.Char8 as C
 import Text.ParserCombinators.Parsec
 import qualified Data.ByteString.Lazy as BL
 import Chatwork.V0.ChatworkConfig
 import Chatwork.V0.Type
+import Chatwork.V0.Message
 import Data.Time.Clock (getCurrentTime)
 import System.Locale (defaultTimeLocale)
 import Data.Time.Format (formatTime)
-import Data.Aeson (decode, FromJSON)
+import Data.Aeson (decode, encode, FromJSON, ToJSON)
 import System.IO.Unsafe (unsafePerformIO)
-import Control.Monad.Reader (runReaderT, ask)
+import Control.Monad.Reader (ask)
 import Control.Monad.IO.Class (liftIO)
+import Prelude hiding (read)
 
 type QueryParam = [(String, String)]
 
 type ApiResponse a = Maybe (Chatwork.V0.Type.Response a)
+
+sendChat :: String -> String -> Auth -> Chatwork IO (ApiResponse ())
+sendChat rid body auth = do
+  post "send_chat" params postdata auth
+    where
+      params = []
+      postdata = SendChatData {
+                   text = body,
+                   room_id = rid,
+                   last_chat_id = "0",
+                   read = "1",
+                   edit_id = "0"
+                 }
 
 getUpdate :: String -> Auth -> Chatwork IO (ApiResponse GetUpdate)
 getUpdate _lastId auth = do
@@ -45,18 +68,25 @@ loadChat roomId auth = do
                    ("desc"            ,  "1") ]
 
 get :: (FromJSON a) => String -> [(String, String)] -> Auth -> Chatwork IO (Maybe (Chatwork.V0.Type.Response a))
-get = request "GET"
-post :: (FromJSON a) => String -> [(String, String)] -> Auth -> Chatwork IO (Maybe (Chatwork.V0.Type.Response a))
-post = request "POST"
+get cmd params auth = request "GET" cmd params Nothing auth
 
-request :: (FromJSON a) => Method -> String -> [(String, String)] -> Auth -> Chatwork IO (Maybe (Chatwork.V0.Type.Response a))
-request method cmd params auth = do
+post :: (FromJSON a, ToJSON b) => String -> [(String, String)] -> b -> Auth -> Chatwork IO (Maybe (Chatwork.V0.Type.Response a))
+post cmd params postdata auth = request "POST" cmd params (Just pdata) auth
+  where
+    pdata = RequestBodyLBS $ "pdata=" `BL.append` json
+    json = encode postdata
+
+--                         method    command   query paramter        post data
+request :: (FromJSON a) => Method -> String -> [(String, String)] -> Maybe RequestBody -> Auth -> Chatwork IO (Maybe (Chatwork.V0.Type.Response a))
+request method cmd params postdata auth = do
   let time = unsafePerformIO $ formatTime defaultTimeLocale "%s" <$> getCurrentTime
   let query = foldl (join "&") [] $ map zipTuple (params ++ authParams auth ++ [("_", time)])
   base <- fmap base ask
   let url = base ++ "gateway.php?cmd=" ++ cmd ++ "&" ++ query
   _req <- parseUrl url
-  let req = _req {cookieJar = Just (jar auth), method = method}
+  let req = case postdata of
+              Just m  -> _req {cookieJar = Just (jar auth), method = method, requestBody = m}
+              Nothing -> _req {cookieJar = Just (jar auth), method = method}
   withManager $ \m -> do
     res <- httpLbs req m
     pure $ decode (responseBody res)
