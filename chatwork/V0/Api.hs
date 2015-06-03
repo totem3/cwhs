@@ -7,6 +7,7 @@ module Chatwork.V0.Api (
   , loadChat
   , readChat
   , getUpdate
+  , sendChat
 )
 where
 
