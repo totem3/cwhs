@@ -14,6 +14,7 @@ where
 import Network.HTTP.Conduit
 import Network.HTTP.Types
 import Control.Applicative (pure, (<$>))
+import Control.Monad.Trans.Resource (runResourceT)
 import qualified Data.ByteString.Char8 as C
 import Text.ParserCombinators.Parsec
 import qualified Data.ByteString.Lazy as BL
@@ -21,8 +22,7 @@ import Chatwork.V0.ChatworkConfig
 import Chatwork.V0.Type
 import Chatwork.V0.Message
 import Data.Time.Clock (getCurrentTime)
-import System.Locale (defaultTimeLocale)
-import Data.Time.Format (formatTime)
+import Data.Time.Format (defaultTimeLocale, formatTime)
 import Data.Aeson (decode, encode, FromJSON, ToJSON)
 import System.IO.Unsafe (unsafePerformIO)
 import Control.Monad.Reader (ask)
@@ -88,9 +88,31 @@ request method cmd params postdata auth = do
   let req = case postdata of
               Just m  -> _req {cookieJar = Just (jar auth), method = method, requestBody = m}
               Nothing -> _req {cookieJar = Just (jar auth), method = method}
-  withManager $ \m -> do
-    res <- httpLbs req m
+  manager <- liftIO $ newManager tlsManagerSettings
+  runResourceT $ do
+    res <- httpLbs req manager
     pure $ decode (responseBody res)
+  where
+    zipTuple (a, b) = a ++ "=" ++ b
+    join s a b = a ++ s ++ b
+
+post2 cmd params postdata auth = request2 "POST" cmd params (Just pdata) auth
+  where
+    pdata = RequestBodyLBS $ "pdata=" `BL.append` json
+    json = encode postdata
+
+request2 method cmd params postdata auth = do
+  let time = unsafePerformIO $ formatTime defaultTimeLocale "%s" <$> getCurrentTime
+  let query = foldl (join "&") [] $ map zipTuple (params ++ authParams auth ++ [("_", time)])
+  base <- fmap base ask
+  let url = base ++ "gateway.php?cmd=" ++ cmd ++ "&" ++ query
+  _req <- parseUrl url
+  let req = case postdata of
+              Just m  -> _req {cookieJar = Just (jar auth), method = method, requestBody = m}
+              Nothing -> _req {cookieJar = Just (jar auth), method = method}
+  manager <- liftIO $ newManager tlsManagerSettings
+  runResourceT $ do
+    httpLbs req manager
   where
     zipTuple (a, b) = a ++ "=" ++ b
     join s a b = a ++ s ++ b
@@ -112,17 +134,17 @@ login = do
   office <- fmap office ask
   let _params = fmap pack $ [("email", email), ("password", password), ("orgkey", office), ("auto_login", "on"), ("login", "Login")]
   let _req = (urlEncodedBody _params req) {method="POST"}
-  withManager $ \m -> do
-    res <- httpLbs _req m
-    let jar = responseCookieJar res
-    let body = responseBody res
-    let authinfo = either (\a -> []) id $ fmap (filter (not.emptuple)) (parse parseHTML "" ((C.unpack $ BL.toStrict body) ++ "\n"))
-    let myid = lookup "myid" authinfo
-    let token = lookup "ACCESS_TOKEN" authinfo
-    let auth = case (myid, token) of
-                 (Just m, Just t) -> Just $ Auth {jar = jar, myid = m, accessToken = t}
-                 _ -> Nothing
-    liftIO.pure $ auth
+  manager <- liftIO $ newManager tlsManagerSettings
+  res <- httpLbs _req manager
+  let jar = responseCookieJar res
+  let body = responseBody res
+  let authinfo = either (\a -> []) id $ fmap (filter (not.emptuple)) (parse parseHTML "" ((C.unpack $ BL.toStrict body) ++ "\n"))
+  let myid = lookup "myid" authinfo
+  let token = lookup "ACCESS_TOKEN" authinfo
+  let auth = case (myid, token) of
+               (Just m, Just t) -> Just $ Auth {jar = jar, myid = m, accessToken = t}
+               _ -> Nothing
+  liftIO.pure $ auth
   where
     pack (a, b) = (a, C.pack b)
     emptuple (a, b) = a == "" && b == ""
