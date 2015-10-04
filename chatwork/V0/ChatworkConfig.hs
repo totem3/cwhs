@@ -1,6 +1,6 @@
 module Chatwork.V0.ChatworkConfig where
 
-import Control.Monad.Reader
+import Control.Monad.State
 import Chatwork.V0.Type (Auth)
 
 data ChatworkConfig = ChatworkConfig {
@@ -11,4 +11,4 @@ data ChatworkConfig = ChatworkConfig {
                         auth :: Maybe Auth
                       } deriving (Show)
 
-type Chatwork = ReaderT ChatworkConfig
+type Chatwork = StateT ChatworkConfig

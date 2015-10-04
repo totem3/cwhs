@@ -25,7 +25,7 @@ import Data.Time.Clock (getCurrentTime)
 import Data.Time.Format (defaultTimeLocale, formatTime)
 import Data.Aeson (decode, encode, FromJSON, ToJSON)
 import System.IO.Unsafe (unsafePerformIO)
-import Control.Monad.Reader (ask)
+import qualified Control.Monad.State as State
 import Control.Monad.IO.Class (liftIO)
 import Prelude hiding (read)
 
@@ -33,40 +33,52 @@ type QueryParam = [(String, String)]
 
 type ApiResponse a = Maybe (Chatwork.V0.Type.Response a)
 
-sendChat :: String -> String -> Auth -> Chatwork IO (ApiResponse ())
-sendChat rid body auth = do
-  post "send_chat" params postdata auth
-    where
-      params = []
-      postdata = SendChatData {
-                   text = body,
-                   room_id = rid,
-                   last_chat_id = "0",
-                   read = "0",
-                   edit_id = "0"
-                 }
+sendChat :: String -> String -> Chatwork IO (ApiResponse ())
+sendChat rid body = do
+  maybeAuth <- fmap auth State.get
+  case maybeAuth of
+    Just auth -> post "send_chat" params postdata auth
+                where
+                  params = []
+                  postdata = SendChatData {
+                               text = body,
+                               room_id = rid,
+                               last_chat_id = "0",
+                               read = "0",
+                               edit_id = "0"
+                             }
+    Nothing -> return Nothing
 
-getUpdate :: String -> Auth -> Chatwork IO (ApiResponse GetUpdate)
-getUpdate _lastId auth = do
-  get "get_update" params auth
-  where params = [ ("last_id" , _lastId),
-                   ("new"     , "1") ]
+getUpdate :: String -> Chatwork IO (ApiResponse GetUpdate)
+getUpdate _lastId = do
+  auth <- fmap auth State.get
+  case auth of
+    Just a -> get "get_update" params a
+                where params = [ ("last_id" , _lastId),
+                                 ("new"     , "1") ]
+    Nothing -> return Nothing
 
-readChat :: RoomId -> MessageId -> Auth -> Chatwork IO (ApiResponse ReadChat)
-readChat roomId lastChatId auth = do
-  get "read" params auth
-  where params = [ ("last_chat_id" , lastChatId),
-                   ("room_id"      , roomId) ]
+readChat :: RoomId -> MessageId -> Chatwork IO (ApiResponse ReadChat)
+readChat roomId lastChatId = do
+  auth <- fmap auth State.get
+  case auth of
+    Just a -> get "read" params a
+                where params = [ ("last_chat_id" , lastChatId),
+                                 ("room_id"      , roomId) ]
+    Nothing -> return Nothing
 
-loadChat :: RoomId -> Auth -> Chatwork IO (ApiResponse LoadChat)
-loadChat roomId auth = do
-  get "load_chat" params auth
-  where params = [ ("room_id"         ,  roomId),
-                   ("last_chat_id"    ,  "0"),
-                   ("first_chat_id"   ,  "0"),
-                   ("jump_to_chat_id" ,  "0"),
-                   ("unread_num"      ,  "0"),
-                   ("desc"            ,  "1") ]
+loadChat :: RoomId -> Chatwork IO (ApiResponse LoadChat)
+loadChat roomId = do
+  auth <- fmap auth State.get
+  case auth of
+    Just a -> get "load_chat" params a
+                where params = [ ("room_id"         ,  roomId),
+                                 ("last_chat_id"    ,  "0"),
+                                 ("first_chat_id"   ,  "0"),
+                                 ("jump_to_chat_id" ,  "0"),
+                                 ("unread_num"      ,  "0"),
+                                 ("desc"            ,  "1") ]
+    Nothing -> return Nothing
 
 get :: (FromJSON a) => String -> [(String, String)] -> Auth -> Chatwork IO (Maybe (Chatwork.V0.Type.Response a))
 get cmd params auth = request "GET" cmd params Nothing auth
@@ -82,7 +94,7 @@ request :: (FromJSON a) => Method -> String -> [(String, String)] -> Maybe Reque
 request method cmd params postdata auth = do
   let time = unsafePerformIO $ formatTime defaultTimeLocale "%s" <$> getCurrentTime
   let query = foldl (join "&") [] $ map zipTuple (params ++ authParams auth ++ [("_", time)])
-  base <- fmap base ask
+  base <- fmap base State.get
   let url = base ++ "gateway.php?cmd=" ++ cmd ++ "&" ++ query
   _req <- parseUrl url
   let contentType = ("Content-Type", C.pack "application/x-www-form-urlencoded; charset=UTF-8")
@@ -97,27 +109,6 @@ request method cmd params postdata auth = do
     zipTuple (a, b) = a ++ "=" ++ b
     join s a b = a ++ s ++ b
 
-post2 cmd params postdata auth = request2 "POST" cmd params (Just pdata) auth
-  where
-    pdata = RequestBodyLBS $ "pdata=" `BL.append` json
-    json = encode postdata
-
-request2 method cmd params postdata auth = do
-  let time = unsafePerformIO $ formatTime defaultTimeLocale "%s" <$> getCurrentTime
-  let query = foldl (join "&") [] $ map zipTuple (params ++ authParams auth ++ [("_", time)])
-  base <- fmap base ask
-  let url = base ++ "gateway.php?cmd=" ++ cmd ++ "&" ++ query
-  _req <- parseUrl url
-  let req = case postdata of
-              Just m  -> _req {cookieJar = Just (jar auth), method = method, requestBody = m}
-              Nothing -> _req {cookieJar = Just (jar auth), method = method}
-  manager <- liftIO $ newManager tlsManagerSettings
-  runResourceT $ do
-    httpLbs req manager
-  where
-    zipTuple (a, b) = a ++ "=" ++ b
-    join s a b = a ++ s ++ b
-
 authParams :: Auth -> QueryParam
 authParams auth = [ ("myid"       ,  myid auth),
                     ("account_id" ,  myid auth),
@@ -128,11 +119,11 @@ authParams auth = [ ("myid"       ,  myid auth),
 
 login :: Chatwork IO (Maybe Auth)
 login = do
-  _base <- fmap base ask
+  _base <- fmap base State.get
   req <- parseUrl $ _base ++ "login.php?lang=en&args="
-  password <- fmap pass ask
-  email <- fmap user ask
-  office <- fmap office ask
+  password <- fmap pass State.get
+  email <- fmap user State.get
+  office <- fmap office State.get
   let _params = fmap pack $ [("email", email), ("password", password), ("orgkey", office), ("auto_login", "on"), ("login", "Login")]
   let _req = (urlEncodedBody _params req) {method="POST"}
   manager <- liftIO $ newManager tlsManagerSettings
@@ -145,6 +136,7 @@ login = do
   let auth = case (myid, token) of
                (Just m, Just t) -> Just $ Auth {jar = jar, myid = m, accessToken = t}
                _ -> Nothing
+  State.put ChatworkConfig { base = _base, office = office, user = email, pass = password, auth = auth}
   liftIO.pure $ auth
   where
     pack (a, b) = (a, C.pack b)
