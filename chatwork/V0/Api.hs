@@ -42,7 +42,7 @@ sendChat rid body auth = do
                    text = body,
                    room_id = rid,
                    last_chat_id = "0",
-                   read = "1",
+                   read = "0",
                    edit_id = "0"
                  }
 
@@ -85,8 +85,9 @@ request method cmd params postdata auth = do
   base <- fmap base ask
   let url = base ++ "gateway.php?cmd=" ++ cmd ++ "&" ++ query
   _req <- parseUrl url
+  let contentType = ("Content-Type", C.pack "application/x-www-form-urlencoded; charset=UTF-8")
   let req = case postdata of
-              Just m  -> _req {cookieJar = Just (jar auth), method = method, requestBody = m}
+              Just m  -> _req {cookieJar = Just (jar auth), method = method, requestBody = m, requestHeaders = [contentType]}
               Nothing -> _req {cookieJar = Just (jar auth), method = method}
   manager <- liftIO $ newManager tlsManagerSettings
   runResourceT $ do
