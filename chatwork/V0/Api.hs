@@ -84,9 +84,9 @@ request method cmd params postdata = do
   maybeAuth <- fmap auth State.get
   case maybeAuth of
     Just auth -> do
-      let query = foldl (join "&") [] $ map zipTuple (("_", time) : params ++ authParams auth)
+      let query = foldl (join "&") [] $ map zipTuple ([("_", time), ("cmd", cmd)] ++ params ++ authParams auth)
       base <- fmap base State.get
-      let url = base ++ "gateway.php?cmd=" ++ cmd ++ "&" ++ query
+      let url = base ++ "gateway.php?" ++ query
       _req <- parseUrl url
       let contentType = ("Content-Type", C.pack "application/x-www-form-urlencoded; charset=UTF-8")
       let req = case postdata of
