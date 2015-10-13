@@ -80,7 +80,7 @@ data UpdateInfo = UpdateInfo {
                     num :: Int,
                     room :: Room
                   } deriving Show
-newtype Room = Room (Map String RoomInfo)
+newtype Room = Room {getRoom :: Map String RoomInfo}
   deriving Show
 data RoomInfo = RoomInfo {
               _i  :: Int,
