@@ -3,6 +3,7 @@ module Chatwork.V0.Type where
 
 import Network.HTTP.Conduit (CookieJar)
 import Data.Aeson
+import Data.Map (Map)
 import Control.Applicative ((<*>))
 import Data.Functor ((<$>))
 import Control.Monad (mzero)
@@ -77,9 +78,11 @@ data UpdateInfo = UpdateInfo {
                     category :: [String],
                     contact :: [String],
                     num :: Int,
-                    room :: [(Int, Room)]
+                    room :: Room
                   } deriving Show
-data Room = Room {
+newtype Room = Room (Map String RoomInfo)
+  deriving Show
+data RoomInfo = RoomInfo {
               _i  :: Int,
               _ld :: Int,
               _p  :: Maybe Int
@@ -99,7 +102,9 @@ instance FromJSON UpdateInfo where
     <*> v .: "room"
   parseJSON _          = mzero
 instance FromJSON Room where
-  parseJSON (Object v) = Room
+  parseJSON val = Room <$> parseJSON val
+instance FromJSON RoomInfo where
+  parseJSON (Object v) = RoomInfo
     <$> v .: "i"
     <*> v .: "ld"
     <*> v .:? "p"
