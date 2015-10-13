@@ -80,8 +80,8 @@ data UpdateInfo = UpdateInfo {
                     num :: Int,
                     room :: Room
                   } deriving Show
-newtype Room = Room {getRoom :: Map String RoomInfo}
-  deriving Show
+data Room = Empty [Char] | Room {getRoom :: Map String RoomInfo} deriving Show
+
 data RoomInfo = RoomInfo {
               _i  :: Int,
               _ld :: Int,
@@ -102,6 +102,7 @@ instance FromJSON UpdateInfo where
     <*> v .: "room"
   parseJSON _          = mzero
 instance FromJSON Room where
+  parseJSON (Array v) = Empty <$> parseJSON "[]"
   parseJSON val = Room <$> parseJSON val
 instance FromJSON RoomInfo where
   parseJSON (Object v) = RoomInfo
