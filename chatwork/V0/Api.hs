@@ -34,7 +34,7 @@ import Data.List (intercalate)
 
 type QueryParam = [(String, String)]
 
-type ApiResponse a = Maybe (Chatwork.V0.Type.Response a)
+type ApiResponse a = Either String (Chatwork.V0.Type.Response a)
 
 sendChat :: String -> String -> Chatwork IO (ApiResponse ())
 sendChat rid body = do
@@ -93,17 +93,17 @@ getRoomInfo roomId = do
                 "load_file_version" .= ("2" :: String)
               ]
 
-get :: (FromJSON a) => String -> [(String, String)] -> Chatwork IO (Maybe (Chatwork.V0.Type.Response a))
+get :: (FromJSON a) => String -> [(String, String)] -> Chatwork IO (ApiResponse a)
 get cmd params = request "GET" cmd params Nothing
 
-post :: (FromJSON a, ToJSON b) => String -> [(String, String)] -> b -> Chatwork IO (Maybe (Chatwork.V0.Type.Response a))
+post :: (FromJSON a, ToJSON b) => String -> [(String, String)] -> b -> Chatwork IO (ApiResponse a)
 post cmd params postdata = request "POST" cmd params (Just pdata)
   where
     pdata = RequestBodyLBS $ "pdata=" `BL.append` json
     json = encode postdata
 
 --                         method    command   query paramter        post data
-request :: (FromJSON a) => Method -> String -> [(String, String)] -> Maybe RequestBody -> Chatwork IO (Maybe (Chatwork.V0.Type.Response a))
+request :: (FromJSON a) => Method -> String -> [(String, String)] -> Maybe RequestBody -> Chatwork IO (ApiResponse a)
 request method cmd params postdata = do
   let time = unsafePerformIO $ formatTime defaultTimeLocale "%s" <$> getCurrentTime
   maybeAuth <- fmap auth State.get
@@ -121,8 +121,8 @@ request method cmd params postdata = do
       manager <- liftIO $ newManager tlsManagerSettings
       runResourceT $ do
         res <- httpLbs req manager
-        pure $ decode (responseBody res)
-    Nothing -> return Nothing
+        pure $ eitherDecode (responseBody res)
+    Nothing -> return (Left "auth failed")
 
 authParams :: Auth -> QueryParam
 authParams auth = [ ("myid"       ,  myid auth),
