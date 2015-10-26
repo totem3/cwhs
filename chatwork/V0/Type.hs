@@ -84,7 +84,7 @@ data Room = Empty [Char] | Room {getRoom :: Map String RoomInfo} deriving Show
 
 data RoomInfo = RoomInfo {
               _i  :: Maybe Int,
-              _ld :: Int,
+              _ld :: Maybe Int,
               _p  :: Maybe Int
             } deriving Show
 instance FromJSON GetUpdate where
@@ -107,7 +107,7 @@ instance FromJSON Room where
 instance FromJSON RoomInfo where
   parseJSON (Object v) = RoomInfo
     <$> v .:? "i"
-    <*> v .: "ld"
+    <*> v .:? "ld"
     <*> v .:? "p"
   parseJSON _          = mzero
 
