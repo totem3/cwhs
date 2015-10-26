@@ -8,6 +8,7 @@ module Chatwork.V0.Api (
   , readChat
   , getUpdate
   , sendChat
+  , getRoomInfo
 )
 where
 
@@ -23,11 +24,13 @@ import Chatwork.V0.Type
 import Chatwork.V0.Message
 import Data.Time.Clock (getCurrentTime)
 import Data.Time.Format (defaultTimeLocale, formatTime)
-import Data.Aeson (decode, encode, FromJSON, ToJSON)
+import Data.Aeson (eitherDecode, decode, encode, FromJSON, ToJSON, object, (.=))
 import System.IO.Unsafe (unsafePerformIO)
 import qualified Control.Monad.State as State
 import Control.Monad.IO.Class (liftIO)
 import Prelude hiding (read)
+import qualified Data.Text as T
+import Data.List (intercalate)
 
 type QueryParam = [(String, String)]
 
@@ -68,6 +71,28 @@ loadChat roomId = do
                    ("unread_num"      ,  "0"),
                    ("desc"            ,  "1") ]
 
+getRoomInfo :: RoomId -> Chatwork IO (ApiResponse RespGetRoomInfo)
+getRoomInfo roomId = do
+  post "get_room_info" [] pdata
+    where
+      pdata = object [
+                "i" .= object [
+                  (T.pack roomId) .= object [
+                    "c" .= (0 :: Int),
+                    "u" .= (0 :: Int),
+                    "l" .= (0 :: Int),
+                    "t" .= (0 :: Int)
+                  ]
+                ],
+                "p" .= ([] :: [Int]),
+                "m" .= ([] :: [Int]),
+                "d" .= ([] :: [Int]),
+                "t" .= object [],
+                "rid" .= (0 :: Int),
+                "type" .= ("" :: String),
+                "load_file_version" .= ("2" :: String)
+              ]
+
 get :: (FromJSON a) => String -> [(String, String)] -> Chatwork IO (Maybe (Chatwork.V0.Type.Response a))
 get cmd params = request "GET" cmd params Nothing
 
@@ -84,10 +109,11 @@ request method cmd params postdata = do
   maybeAuth <- fmap auth State.get
   case maybeAuth of
     Just auth -> do
-      let query = foldl (join "&") [] $ map zipTuple ([("_", time), ("cmd", cmd)] ++ params ++ authParams auth)
+      let query = (fmap.fmap) Just $ fmap (\(a, b) -> (C.pack a, C.pack b)) $ filter (not.null) $ ([("_", time), ("cmd", cmd)] ++ params ++ authParams auth)
       base <- fmap base State.get
-      let url = base ++ "gateway.php?" ++ query
-      _req <- parseUrl url
+      let url = base ++ "gateway.php?"
+      __req <- parseUrl url
+      let _req = setQueryString query __req
       let contentType = ("Content-Type", C.pack "application/x-www-form-urlencoded; charset=UTF-8")
       let req = case postdata of
                   Just m  -> _req {cookieJar = Just (jar auth), method = method, requestBody = m, requestHeaders = [contentType]}
@@ -97,16 +123,13 @@ request method cmd params postdata = do
         res <- httpLbs req manager
         pure $ decode (responseBody res)
     Nothing -> return Nothing
-  where
-    zipTuple (a, b) = a ++ "=" ++ b
-    join s a b = a ++ s ++ b
 
 authParams :: Auth -> QueryParam
 authParams auth = [ ("myid"       ,  myid auth),
-                    ("account_id" ,  myid auth),
+                    -- ("account_id" ,  myid auth),
                     ("_t"         ,  accessToken auth),
                     ("_v"         ,  "1.80a"),
-                    ("ver"        ,  "1.80a"),
+                    -- ("ver"        ,  "1.80a"),
                     ("_av"        ,  "4") ]
 
 login :: Chatwork IO (Maybe Auth)
@@ -183,4 +206,3 @@ jsStrVar str = do
 
 eol :: GenParser Char st Char
 eol = char '\n'
-

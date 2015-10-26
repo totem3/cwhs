@@ -112,40 +112,48 @@ instance FromJSON RoomInfo where
   parseJSON _          = mzero
 
 
-data PData = PData {
-               roomData :: [(String, PRoomData)],
-               p :: [String],
-               m :: [String],
-               d :: [String],
-               rid :: String,
-               t :: String,
-               ptype :: String
-             }
-instance FromJSON PData where
-  parseJSON (Object v) = PData
-    <$> v .: "i"
-    <*> v .: "p"
-    <*> v .: "m"
-    <*> v .: "d"
-    <*> v .: "t"
-    <*> v .: "rid"
-    <*> v .: "type"
-  parseJSON _           = mzero
+data RespGetRoomInfo = RespGetRoomInfo { runRoomInfo :: GetRoomInfo } deriving Show
+instance FromJSON RespGetRoomInfo where
+  parseJSON (Object v) = RespGetRoomInfo
+    <$> v .: "room_dat"
 
-data PRoomData = PRoomData {
-                   c :: Int,
-                   f :: Int,
-                   l :: Int,
-                   lf :: Int,
-                   ptime :: Int,
-                   u :: Int
-                 }
-instance FromJSON PRoomData where
-  parseJSON (Object v) = PRoomData
+data GetRoomInfo = GetRoomInfo { runRoomData :: Map String RoomData } deriving Show
+instance FromJSON GetRoomInfo where
+  parseJSON v = GetRoomInfo <$> parseJSON v
+
+data RoomData = RoomData {
+                  rdChatNum :: Int,
+                  rdChatList :: Maybe [ChatData],
+                  rdf :: Int,
+                  rdln :: Maybe String,
+                  rdlt :: Int,
+                  rdChatName :: Maybe String,
+                  rdt :: Int,
+                  rdtp :: Int
+                } deriving Show
+
+instance FromJSON RoomData where
+  parseJSON (Object v) = RoomData
     <$> v .: "c"
-    <*> v .: "u"
-    <*> v .: "l"
+    <*> v .:? "chat_list"
     <*> v .: "f"
-    <*> v .: "lf"
+    <*> v .:? "ln"
+    <*> v .: "lt"
+    <*> v .:? "n"
     <*> v .: "t"
-  parseJSON _           = mzero
+    <*> v .: "tp"
+
+data ChatData = ChatData {
+                  _aid :: Int,
+                  _id :: Int,
+                  _msg :: String,
+                  _tm :: Int,
+                  _utm :: Int
+                } deriving Show
+instance FromJSON ChatData where
+  parseJSON (Object v) = ChatData
+    <$> v .: "aid"
+    <*> v .: "id"
+    <*> v .: "msg"
+    <*> v .: "tm"
+    <*> v .: "utm"
