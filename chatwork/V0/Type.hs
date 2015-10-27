@@ -74,13 +74,22 @@ data GetUpdate = GetUpdate {
                    updateInfo :: UpdateInfo
                  } deriving Show
 data UpdateInfo = UpdateInfo {
-                    account :: [String],
+                    account :: Account,
                     category :: [String],
                     contact :: [String],
                     num :: Int,
                     room :: Room
                   } deriving Show
+
 data Room = Empty [Char] | Room {getRoom :: Map String RoomInfo} deriving Show
+data Account = EmptyA [Char] | Account {a :: AccountInfo} deriving Show
+data AccountInfo = AccountInfo ( Map String Int ) deriving Show
+
+instance FromJSON Account where
+  parseJSON (Array v) = EmptyA <$> parseJSON "[]"
+  parseJSON (Object v) = Account <$> v .: "a"
+instance FromJSON AccountInfo where
+  parseJSON val = AccountInfo <$> parseJSON val
 
 data RoomInfo = RoomInfo {
               _i  :: Maybe Int,
