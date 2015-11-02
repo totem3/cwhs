@@ -76,7 +76,7 @@ data GetUpdate = GetUpdate {
 data UpdateInfo = UpdateInfo {
                     account :: Account,
                     category :: [String],
-                    contact :: [String],
+                    contact :: Contact,
                     num :: Int,
                     room :: Room
                   } deriving Show
