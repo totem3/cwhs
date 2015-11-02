@@ -82,14 +82,22 @@ data UpdateInfo = UpdateInfo {
                   } deriving Show
 
 data Room = Empty [Char] | Room {getRoom :: Map String RoomInfo} deriving Show
-data Account = EmptyA [Char] | Account {a :: AccountInfo} deriving Show
+data Account = EmptyA [Char] | Account {ai :: AccountInfo} deriving Show
 data AccountInfo = AccountInfo ( Map String Int ) deriving Show
-
 instance FromJSON Account where
   parseJSON (Array v) = EmptyA <$> parseJSON "[]"
   parseJSON (Object v) = Account <$> v .: "a"
 instance FromJSON AccountInfo where
   parseJSON val = AccountInfo <$> parseJSON val
+
+data Contact = EmptyC [Char] | Contact {ci :: ContactInfo} deriving Show
+data ContactInfo = ContactInfo ( Map String Int ) deriving Show
+instance FromJSON Contact where
+  parseJSON (Array v) = EmptyC <$> parseJSON "[]"
+  parseJSON (Object v) = Contact <$> v .: "a"
+instance FromJSON ContactInfo where
+  parseJSON val = ContactInfo <$> parseJSON val
+
 
 data RoomInfo = RoomInfo {
               _i  :: Maybe Int,
