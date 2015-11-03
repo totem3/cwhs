@@ -31,6 +31,7 @@ import Control.Monad.IO.Class (liftIO)
 import Prelude hiding (read)
 import qualified Data.Text as T
 import Data.List (intercalate)
+import qualified Control.Exception as E
 
 type QueryParam = [(String, String)]
 
@@ -121,8 +122,25 @@ request method cmd params postdata = do
       manager <- liftIO $ newManager tlsManagerSettings
       runResourceT $ do
         res <- httpLbs req manager
-        pure $ eitherDecode (responseBody res)
+        return $ eitherDecode (responseBody res)
+      `catchStateT` httpExceptionHandler
     Nothing -> return (Left "auth failed")
+
+catchStateT :: E.Exception e
+            => State.StateT s IO a
+            -> (e -> State.StateT s IO a)
+            -> State.StateT s IO a
+catchStateT a onE = do
+    s1 <- State.get
+    (result, s2) <- liftIO $ State.runStateT a s1 `E.catch` \e ->
+        State.runStateT (onE e) s1
+    State.put s2
+    return result
+
+httpExceptionHandler :: (FromJSON a) => HttpException -> Chatwork IO (ApiResponse a)
+httpExceptionHandler e = do
+  liftIO $ print e
+  return $ Left (show e)
 
 authParams :: Auth -> QueryParam
 authParams auth = [ ("myid"       ,  myid auth),
