@@ -127,6 +127,7 @@ request method cmd params postdata = do
       manager <- liftIO $ newManager tlsManagerSettings
       runResourceT $ do
         res <- httpLbs req manager
+        liftIO $ BL.putStrLn (responseBody res)
         return $ eitherDecode (responseBody res)
       `catchStateT` httpExceptionHandler
     Nothing -> return (Left "auth failed")
