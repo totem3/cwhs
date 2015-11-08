@@ -90,10 +90,10 @@ instance FromJSON Account where
 instance FromJSON AccountInfo where
   parseJSON val = AccountInfo <$> parseJSON val
 
-data Contact = EmptyC [Char] | Contact {ci :: [Int]} deriving Show
+data Contact = EmptyC [Char] | Contact {ci :: Maybe [Int]} deriving Show
 instance FromJSON Contact where
   parseJSON (Array v) = EmptyC <$> parseJSON "[]"
-  parseJSON (Object v) = Contact <$> v .: "a"
+  parseJSON (Object v) = Contact <$> v .:? "a"
 
 data RoomInfo = RoomInfo {
               _i  :: Maybe Int,
