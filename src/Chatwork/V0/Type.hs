@@ -170,3 +170,77 @@ instance FromJSON ChatData where
     <*> v .: "msg"
     <*> v .: "tm"
     <*> v .: "utm"
+
+data LoadRequest = LoadRequest {
+                     infoUpdate :: Map String InfoUpdate,
+                     personalUpdate :: [Int],
+                     mentionUpdate :: [Int],
+                     descUpdate :: [Int],
+                     taskUpdate :: TaskUpdate,
+                     loadRequestRid :: Int,
+                     loadRequestType :: String,
+                     loadFileVersion :: Int
+                   } deriving Show
+
+data InfoUpdate = InfoUpdate {
+                    chutNum :: Int,
+                    unreadNum :: Int,
+                    lastChatId :: Int,
+                    fileNum :: Int,
+                    lastFileId :: Int,
+                    infoLastUpdate :: Int
+                  } deriving Show
+instance ToJSON InfoUpdate where
+  toJSON iu = object [
+                "c"  .= chutNum iu,
+                "u"  .= unreadNum iu,
+                "l"  .= lastChatId iu,
+                "f"  .= fileNum iu,
+                "lf" .= lastFileId iu,
+                "t"  .= infoLastUpdate iu
+              ]
+
+data TaskUpdate = TaskUpdate {
+                    taskUpdateRooms :: [TaskUpdateRoom]
+                  } deriving Show
+
+data TaskUpdateRoom = TaskUpdateRoom {
+                        taskUpdateRoomId :: Int,
+                        taskIds :: [Int]
+                      } deriving Show
+
+{- 
+pdata:
+{
+  "i": {},
+  "p": [
+    "17760575"
+  ],
+  "m": [],
+  "d": [],
+  "t": {},
+  "rid": 0,
+  "type": "",
+  "load_file_version": "2"
+}
+
+{
+  "i": {
+    "26358354": {
+      "c": 20407,
+      "u": 4,
+      "l": 900646930,
+      "f": 0,
+      "lf": 0,
+      "t": 1447103975
+    }
+  },
+  "p": [],
+  "m": [],
+  "d": [],
+  "t": {},
+  "rid": 0,
+  "type": "",
+  "load_file_version": "2"
+}
+-}
