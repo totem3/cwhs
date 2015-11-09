@@ -24,7 +24,7 @@ import Chatwork.V0.Type
 import Chatwork.V0.Message
 import Data.Time.Clock (getCurrentTime)
 import Data.Time.Format (defaultTimeLocale, formatTime)
-import Data.Aeson (eitherDecode, decode, encode, FromJSON, ToJSON, object, (.=))
+import Data.Aeson (eitherDecode, decode, encode, FromJSON, ToJSON, object, (.=), toJSON)
 import System.IO.Unsafe (unsafePerformIO)
 import qualified Control.Monad.State as State
 import Control.Monad.IO.Class (liftIO)
@@ -71,6 +71,10 @@ loadChat roomId = do
                    ("jump_to_chat_id" ,  "0"),
                    ("unread_num"      ,  "0"),
                    ("desc"            ,  "1") ]
+
+loadRoom :: LoadRequest -> Chatwork IO (ApiResponse ())
+loadRoom request = do
+  post "get_room_info" [] (toJSON request)
 
 getRoomInfo :: RoomId -> Chatwork IO (ApiResponse RespGetRoomInfo)
 getRoomInfo roomId = do
