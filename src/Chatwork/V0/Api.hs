@@ -5,6 +5,7 @@ module Chatwork.V0.Api (
   , module Chatwork.V0.Message
   , login
   , loadChat
+  , loadRoom
   , readChat
   , getUpdate
   , sendChat
